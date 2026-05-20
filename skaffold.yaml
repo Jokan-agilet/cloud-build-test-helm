@@ -1,0 +1,20 @@
+apiVersion: skaffold/v3
+kind: Config
+metadata:
+  name: cloud-deploy-test
+manifests:
+  helm:
+    releases:
+      - name: cloud-build-test-helm
+        chartPath: .
+        valuesFiles:
+          - values.yaml
+profiles:
+  - name: dev
+    patches:
+      - op: replace
+        path: /manifests/helm/releases/0/valuesFiles
+        value:
+          - values.yaml
+deploy:
+  kubectl: {}

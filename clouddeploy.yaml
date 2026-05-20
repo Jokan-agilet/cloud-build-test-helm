@@ -1,0 +1,30 @@
+# ========================================================
+# 1. 目标环境定义 (原 target.yaml の内容)
+# ========================================================
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: tg-1
+description: "测试环境 GKE 集群"
+requireApproval: false
+gke:
+  cluster: projects/circleci-demo-484408/locations/asia-northeast1/clusters/cloud-deploy-test-claster
+executionConfigs:
+  - usages: [RENDER, DEPLOY]
+    serviceAccount: for-circleci@circleci-demo-484408.iam.gserviceaccount.com
+    artifactStorage: gs://circleci-demo-484408-clouddeploy-storage
+---
+
+# ========================================================
+# 2. 流水线航海图定义 (原 clouddeploy.yaml の内容)
+# ========================================================
+
+apiVersion: deploy.cloud.google.com/v1
+kind: DeliveryPipeline
+metadata:
+  name: cloud-deploy-test
+serialPipeline:
+  stages:
+    - targetId: tg-1
+      profiles:
+        - dev

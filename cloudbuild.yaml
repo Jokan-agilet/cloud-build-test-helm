@@ -1,0 +1,53 @@
+steps:
+  # ==========================================================
+  # 步骤 1：压缩源码（先写到外部 /tmp 目录，避开套娃悖论）
+  # ==========================================================
+  - name: 'ubuntu'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== 开始手动压缩源码 ==="
+        # 1. 把压缩包生成到安全的 /tmp 目录下
+        tar -czf /tmp/source.tar.gz --exclude=.git .
+        
+        # 2. 打包完成后，再安全地移回当前工作空间
+        mv /tmp/source.tar.gz ./source.tar.gz
+        echo "=== 压缩完成 ==="
+    id: '1-手动物理压缩'
+
+  # ==========================================================
+  # 步骤 2：上传到 GCS 暂存区 (手动物理上传)
+  # ==========================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== 开始手动上传到自定义桶 ==="
+        # 使用我们在上一轮成功搞定的那个自定义存储桶
+        gcloud storage cp source.tar.gz gs://circleci-demo-484408-clouddeploy-storage/source.tar.gz
+    id: '2-手动物理上传'
+
+  # ==========================================================
+  # 步骤 3：调用 Cloud Deploy API (只传 GCS 地址，不传本地目录)
+  # ==========================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-exc'
+      - |
+        echo "=== 开始调用 API 创建 Release ==="
+        DEPLOY_TIME=$(date +%Y%m%d-%H%M%S)
+        
+        # 💡 注意：这里的 --source 不再是 "."，而是直接指向步骤2上传好的 GCS 路径！
+        gcloud deploy releases create "rel-$$DEPLOY_TIME" \
+          --delivery-pipeline="cloud-deploy-test" \
+          --region="asia-northeast1" \
+          --project="${PROJECT_ID}" \
+          --source="gs://circleci-demo-484408-clouddeploy-storage/source.tar.gz"
+    id: '3-纯粹调用API'
+
+# オプション設定
+options:
+  logging: CLOUD_LOGGING_ONLY # ログをCloud Loggingに集約（BigQuery分析に便利）

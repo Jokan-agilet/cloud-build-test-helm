@@ -1,15 +1,29 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "cloud-build-test-helm.fullname" . }}-test-connection"
+  name: "{{ .Release.Name }}-test-connection"
   labels:
-    {{- include "cloud-build-test-helm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}
   annotations:
     "helm.sh/hook": test
 spec:
   containers:
     - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['{{ include "cloud-build-test-helm.fullname" . }}:{{ .Values.service.port }}']
+      image: busybox:latest
+      command: ['sh', '-c']
+      args:
+        - |
+          echo "=== 开始网络连通性探测 ==="
+          # 循环 30 次，每次等 3 秒，留出 90 秒让 Spring Boot 物理启动
+          for i in $(seq 1 30); do
+            # 使用 nc -z 探测端口，-w 2 代表超时 2 秒。只管端口通不通，不管 HTTP 状态码
+            if nc -z -w 2 {{ .Release.Name }}-service {{ .Values.service.port }}; then
+              echo "🎉 完美连通！Spring Boot 端口已成功开放，服务已就绪！"
+              exit 0
+            fi
+            echo "⚠️ 探测失败，正在等待应用初始化... (第 $i/30 次尝试)"
+            sleep 3
+          done
+          echo "❌ 超时！服务在 90 秒内未能就绪。"
+          exit 1
   restartPolicy: Never
